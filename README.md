@@ -1,26 +1,54 @@
-**DEVELOPER INSTRUCTIONS:**
-
-This repo is a template for developers to use when creating new [libdns](https://github.com/libdns/libdns) provider implementations.
-
-Be sure to update:
-
-- The package name
-- The Go module name in go.mod
-- The latest `libdns/libdns` version in go.mod
-- All comments and documentation, including README below and godocs
-- License (must be compatible with Apache/MIT)
-- All "TODO:"s is in the code
-- All methods that currently do nothing
-
-Remove this section from the readme before publishing.
-
----
-
-\<PROVIDER NAME\> for [`libdns`](https://github.com/libdns/libdns)
+NameSilo DNS for [`libdns`](https://github.com/libdns/libdns)
 =======================
 
-[![Go Reference](https://pkg.go.dev/badge/test.svg)](https://pkg.go.dev/github.com/libdns/TODO:PROVIDER_NAME)
+[![Go Reference](https://pkg.go.dev/badge/test.svg)](https://pkg.go.dev/github.com/libdns/namesilo)
 
-This package implements the [libdns interfaces](https://github.com/libdns/libdns) for \<PROVIDER\>, allowing you to manage DNS records.
+This package implements the [libdns interfaces](https://github.com/libdns/libdns) for the [NameSilo DNS API](https://www.namesilo.com/api-reference), allowing you to manage DNS records.
 
-TODO: Show how to configure and use. Explain any caveats.
+## Authentication
+
+In order to use NameSilo DNS for libdns, the NameSilo API key is required as the token. One can obtain it on the API Manager page within one's account.
+
+## Example
+
+The following example shows how to retrieve the DNS records.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"github.com/libdns/namesilo"
+)
+
+func main() {
+	token := os.Getenv("LIBDNS_NAMESILO_TOKEN")
+	if token == "" {
+		fmt.Println("LIBDNS_NAMESILO_TOKEN not set")
+		return
+	}
+
+	zone := os.Getenv("LIBDNS_NAMESILO_ZONE")
+	if token == "" {
+		fmt.Println("LIBDNS_NAMESILO_ZONE not set")
+		return
+	}
+
+	p := &namesilo.Provider{
+		AuthAPIToken: token,
+	}
+
+	ctx := context.Background()
+	records, err := p.GetRecords(ctx, zone)
+	if err != nil {
+		fmt.Printf("Error: %v", err)
+		return
+	}
+
+	fmt.Println(records)
+}
+
+```
