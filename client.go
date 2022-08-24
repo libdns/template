@@ -3,9 +3,9 @@ package ddnss
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"mime/multipart"
 	"net/http"
 	"net/http/cookiejar"
@@ -54,7 +54,7 @@ func (p *Provider) setRecord(ctx context.Context, zone string, record libdns.Rec
 	if err != nil {
 		return err
 	}
-	log.Printf("Set record done for %s", record.Name)
+
 	return nil
 }
 
@@ -62,12 +62,7 @@ func (p *Provider) doRequest(ctx context.Context, domain string, params map[stri
 	u, _ := url.Parse("https://ddnss.de/upd.php")
 
 	// extract the main domain
-	var mainDomain string
-	if p.OverrideDomain != "" {
-		mainDomain = p.OverrideDomain
-	} else {
-		mainDomain = getMainDomain(domain)
-	}
+	var mainDomain string = getMainDomain(domain)
 
 	if len(mainDomain) == 0 {
 		return nil, fmt.Errorf("unable to find the main domain for: %s", domain)
@@ -85,8 +80,6 @@ func (p *Provider) doRequest(ctx context.Context, domain string, params map[stri
 
 	// set the query back on the URL
 	u.RawQuery = query.Encode()
-
-	log.Printf("Update request to %s for %s", u.String(), domain)
 
 	// make the request
 	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
@@ -127,11 +120,9 @@ func (p *Provider) doRequest(ctx context.Context, domain string, params map[stri
 			continue
 		}
 		text := strings.TrimSpace(n.FirstChild.Data)
-		log.Printf("Got nodes %s\n", text)
 		if strings.Index(text, "Updated ") == 0 {
 			domains = append(domains, domain)
 
-			log.Printf("Update for %s was successful\n", domain)
 			return domains, nil
 		}
 	}
@@ -141,9 +132,7 @@ func (p *Provider) doRequest(ctx context.Context, domain string, params map[stri
 
 func getMainDomain(domain string) string {
 	domain = strings.TrimSuffix(domain, ".")
-	log.Printf("getMainDomain start %s", domain)
 	domain = strings.TrimLeft(domain, "_acme-challenge.")
-	log.Printf("getMainDomain done %s", domain)
 	return domain
 }
 
@@ -161,7 +150,7 @@ func getDomainFromWebinterface(username string, password string) ([]string, erro
 
 	jar, err := cookiejar.New(&options)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	payload := &bytes.Buffer{}
@@ -171,7 +160,6 @@ func getDomainFromWebinterface(username string, password string) ([]string, erro
 	_ = writer.WriteField("passwd", password)
 	err = writer.Close()
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
@@ -184,7 +172,6 @@ func getDomainFromWebinterface(username string, password string) ([]string, erro
 
 	req, err := http.NewRequest(method, ddnssLoginUrl, payload)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
@@ -192,13 +179,12 @@ func getDomainFromWebinterface(username string, password string) ([]string, erro
 	req.Header.Set("User-Agent", "golang")
 	res, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
 	cookies := res.Cookies()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	defer res.Body.Close()
@@ -208,29 +194,27 @@ func getDomainFromWebinterface(username string, password string) ([]string, erro
 
 	res, err = client.Get(ddnssDomainListUrl)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	bodyBytes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 
-	doc, err := htmlquery.Parse(strings.NewReader(string(bodyBytes)))
+	doc, err := htmlquery.Parse(bytes.NewReader(bodyBytes))
 	if err != nil {
-		panic(`not a valid XPath expression.`)
+		return nil, errors.New(`not a valid XPath expression.`)
 	}
 
 	nodes, err := htmlquery.QueryAll(doc, "//u")
 	if err != nil {
-		panic(`not a valid XPath expression.`)
+		return nil, errors.New(`not a valid XPath expression.`)
 	}
 
 	domains := []string{}
 	for _, n := range nodes {
 		domain := strings.TrimSpace(n.FirstChild.Data)
-		log.Printf("[DDNSS] Found domain %s", domain)
 		domains = append(domains, domain)
 	}
 

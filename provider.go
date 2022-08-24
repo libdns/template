@@ -11,10 +11,9 @@ import (
 
 // Provider facilitates DNS record manipulation with ddnss.
 type Provider struct {
-	APIToken       string ``
-	Username       string ``
-	Password       string ``
-	OverrideDomain string ``
+	APIToken string `json:"api_token"`
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
 
 	mutex sync.Mutex
 }
