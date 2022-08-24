@@ -1,47 +1,91 @@
 // Package libdnstemplate implements a DNS record management client compatible
-// with the libdns interfaces for <PROVIDER NAME>. TODO: This package is a
-// template only. Customize all godocs for actual implementation.
-package libdnstemplate
+// with the libdns interfaces for ddnss.
+package ddnss
 
 import (
 	"context"
-	"fmt"
+	"sync"
 
 	"github.com/libdns/libdns"
 )
 
-// TODO: Providers must not require additional provisioning steps by the callers; it
-// should work simply by populating a struct and calling methods on it. If your DNS
-// service requires long-lived state or some extra provisioning step, do it implicitly
-// when methods are called; sync.Once can help with this, and/or you can use a
-// sync.(RW)Mutex in your Provider struct to synchronize implicit provisioning.
-
-// Provider facilitates DNS record manipulation with <TODO: PROVIDER NAME>.
+// Provider facilitates DNS record manipulation with ddnss.
 type Provider struct {
-	// TODO: put config fields here (with snake_case json
-	// struct tags on exported fields), for example:
-	APIToken string `json:"api_token,omitempty"`
+	APIToken       string ``
+	Username       string ``
+	Password       string ``
+	OverrideDomain string ``
+
+	mutex sync.Mutex
 }
 
 // GetRecords lists all the records in the zone.
 func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
-	return nil, fmt.Errorf("TODO: not implemented")
+	domains, err := p.getDomainsFromWebinterface()
+	if err != nil {
+		return nil, err
+	}
+
+	records := []libdns.Record{}
+	for _, domain := range domains {
+		records = append(records, libdns.Record{
+			ID:    domain,
+			Name:  domain,
+			Type:  domain,
+			Value: domain,
+		})
+	}
+
+	return records, nil
 }
 
 // AppendRecords adds records to the zone. It returns the records that were added.
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return nil, fmt.Errorf("TODO: not implemented")
+
+	var appendedRecords []libdns.Record
+
+	for _, rec := range records {
+		err := p.setRecord(ctx, zone, rec, false)
+		if err != nil {
+			return nil, err
+		}
+		appendedRecords = append(appendedRecords, rec)
+	}
+
+	return appendedRecords, nil
 }
 
 // SetRecords sets the records in the zone, either by updating existing records or creating new ones.
 // It returns the updated records.
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return nil, fmt.Errorf("TODO: not implemented")
+
+	var setRecords []libdns.Record
+
+	for _, rec := range records {
+		err := p.setRecord(ctx, zone, rec, false)
+		if err != nil {
+			return nil, err
+		}
+		setRecords = append(setRecords, rec)
+	}
+
+	return setRecords, nil
 }
 
 // DeleteRecords deletes the records from the zone. It returns the records that were deleted.
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return nil, fmt.Errorf("TODO: not implemented")
+
+	var deletedRecords []libdns.Record
+
+	for _, rec := range records {
+		err := p.setRecord(ctx, zone, rec, true)
+		if err != nil {
+			return nil, err
+		}
+		deletedRecords = append(deletedRecords, rec)
+	}
+
+	return deletedRecords, nil
 }
 
 // Interface guards
