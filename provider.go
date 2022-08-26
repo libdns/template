@@ -77,6 +77,7 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 
 	var records []libdns.Record
 
+	// API response is not consistent with record value naming
 	for _, record := range response.Records {
 		var value string
 		if record.DestinationHostname != "" {
@@ -196,11 +197,43 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 
 // SetRecords sets the records in the zone, either by updating existing records or creating new ones.
 // It returns the updated records.
+//
+// API docs: https://es.dinahosting.com/api/documentation
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	return nil, fmt.Errorf("TODO: not implemented")
+
+	// Get all records for the zone, needed to check for existing records
+	existingRecords, err := p.GetRecords(ctx, zone)
+	if err != nil {
+		return nil, err
+	}
+	var toDelete []libdns.Record
+	var results []libdns.Record
+	for _, record := range records {
+		for _, existingRecord := range existingRecords {
+			// If record already exist we need to delete it and create it again with the new value
+			// as API does not have update
+			if record.Name == existingRecord.Name && record.Type == existingRecord.Type {
+				toDelete = append(toDelete, record)
+				results = append(results, record)
+			} else {
+				results = append(results, record)
+			}
+		}
+	}
+
+	if _, err := p.DeleteRecords(ctx, zone, toDelete); err != nil {
+		return nil, err
+	}
+	if _, err := p.AppendRecords(ctx, zone, results); err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 // DeleteRecords deletes the records from the zone. It returns the records that were deleted.
+//
+// API docs: https://es.dinahosting.com/api/documentation
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 
 	endpoint, err := url.Parse(endpointBase)
