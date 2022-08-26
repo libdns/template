@@ -1,4 +1,4 @@
-module github.com/libdns/dinahosting
+module github.com/plorenzo/libdns-dinahosting
 
 go 1.19
 
