@@ -75,6 +75,10 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 		return nil, fmt.Errorf("API response parsing failed: %s", err)
 	}
 
+	if response.Message != "Success." {
+		return nil, fmt.Errorf("could not create TXT record. Dinahosting API error code: %d", response.ResponseCode)
+	}
+
 	var records []libdns.Record
 
 	// API response is not consistent with record value naming
@@ -167,7 +171,7 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 		if record.Type == "A" {
 			params.Add("command", "Domain_Zone_AddTypeA")
 			params.Add("hostname", record.Name)
-			params.Add("text", record.Value)
+			params.Add("ip", record.Value)
 			endpoint.RawQuery = params.Encode()
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
