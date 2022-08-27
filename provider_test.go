@@ -124,7 +124,7 @@ func TestProvider_AppendRecords(t *testing.T) {
 					{
 						ID:       "",
 						Type:     "A",
-						Name:     "@",
+						Name:     "test",
 						Value:    "1.1.1.1",
 						TTL:      0,
 						Priority: 0,
@@ -135,7 +135,7 @@ func TestProvider_AppendRecords(t *testing.T) {
 				{
 					ID:       "",
 					Type:     "A",
-					Name:     "@",
+					Name:     "test",
 					Value:    "1.1.1.1",
 					TTL:      0,
 					Priority: 0,
@@ -156,7 +156,7 @@ func TestProvider_AppendRecords(t *testing.T) {
 					{
 						ID:       "",
 						Type:     "A",
-						Name:     "@",
+						Name:     "test",
 						Value:    "1.1.1.1",
 						TTL:      0,
 						Priority: 0,
@@ -217,7 +217,108 @@ func TestProvider_AppendRecords(t *testing.T) {
 	}
 }
 
+func TestProvider_SetRecords(t *testing.T) {
+	type fields struct {
+		Username string
+		Password string
+	}
+	type args struct {
+		ctx     context.Context
+		zone    string
+		records []libdns.Record
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []libdns.Record
+		wantErr bool
+	}{
+		{
+			name: "Test update A record",
+			fields: fields{
+				Username: username,
+				Password: password,
+			},
+			args: args{
+				ctx:  context.Background(),
+				zone: zone,
+				records: []libdns.Record{
+					{
+						ID:       "",
+						Type:     "A",
+						Name:     "test",
+						Value:    "2.2.2.2",
+						TTL:      0,
+						Priority: 0,
+					},
+				},
+			},
+			want: []libdns.Record{
+				{
+					ID:       "",
+					Type:     "A",
+					Name:     "test",
+					Value:    "2.2.2.2",
+					TTL:      0,
+					Priority: 0,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test create TXT record",
+			fields: fields{
+				Username: username,
+				Password: password,
+			},
+			args: args{
+				ctx:  context.Background(),
+				zone: zone,
+				records: []libdns.Record{
+					{
+						ID:       "",
+						Type:     "TXT",
+						Name:     "test",
+						Value:    "3.3.3.3",
+						TTL:      0,
+						Priority: 0,
+					},
+				},
+			},
+			want: []libdns.Record{
+				{
+					ID:       "",
+					Type:     "TXT",
+					Name:     "test",
+					Value:    "3.3.3.3",
+					TTL:      0,
+					Priority: 0,
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &Provider{
+				Username: tt.fields.Username,
+				Password: tt.fields.Password,
+			}
+			got, err := p.SetRecords(tt.args.ctx, tt.args.zone, tt.args.records)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Provider.SetRecords() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Provider.SetRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestProvider_DeleteRecords(t *testing.T) {
+
 	type fields struct {
 		Username string
 		Password string
@@ -247,8 +348,8 @@ func TestProvider_DeleteRecords(t *testing.T) {
 					{
 						ID:       "",
 						Type:     "A",
-						Name:     "@",
-						Value:    "1.1.1.1",
+						Name:     "test",
+						Value:    "2.2.2.2",
 						TTL:      0,
 						Priority: 0,
 					},
@@ -258,8 +359,8 @@ func TestProvider_DeleteRecords(t *testing.T) {
 				{
 					ID:       "",
 					Type:     "A",
-					Name:     "@",
-					Value:    "1.1.1.1",
+					Name:     "test",
+					Value:    "2.2.2.2",
 					TTL:      0,
 					Priority: 0,
 				},
@@ -284,6 +385,14 @@ func TestProvider_DeleteRecords(t *testing.T) {
 						TTL:      0,
 						Priority: 0,
 					},
+					{
+						ID:       "",
+						Type:     "TXT",
+						Name:     "test",
+						Value:    "3.3.3.3",
+						TTL:      0,
+						Priority: 0,
+					},
 				},
 			},
 			want: []libdns.Record{
@@ -292,6 +401,14 @@ func TestProvider_DeleteRecords(t *testing.T) {
 					Type:     "TXT",
 					Name:     "test",
 					Value:    "2.2.2.2",
+					TTL:      0,
+					Priority: 0,
+				},
+				{
+					ID:       "",
+					Type:     "TXT",
+					Name:     "test",
+					Value:    "3.3.3.3",
 					TTL:      0,
 					Priority: 0,
 				},

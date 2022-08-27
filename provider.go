@@ -108,6 +108,10 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 // API docs: https://es.dinahosting.com/api/documentation
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 
+	if len(records) == 0 {
+		return nil, fmt.Errorf("empty input Record list")
+	}
+
 	endpoint, err := url.Parse(endpointBase)
 	if err != nil {
 		return nil, err
@@ -205,6 +209,10 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 // API docs: https://es.dinahosting.com/api/documentation
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 
+	if len(records) == 0 {
+		return nil, fmt.Errorf("empty input Record list")
+	}
+
 	// Get all records for the zone, needed to check for existing records
 	existingRecords, err := p.GetRecords(ctx, zone)
 	if err != nil {
@@ -213,20 +221,29 @@ func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns
 	var toDelete []libdns.Record
 	var results []libdns.Record
 	for _, record := range records {
+		saved := 0
 		for _, existingRecord := range existingRecords {
 			// If record already exist we need to delete it and create it again with the new value
 			// as API does not have update
-			if record.Name == existingRecord.Name && record.Type == existingRecord.Type {
-				toDelete = append(toDelete, record)
-				results = append(results, record)
-			} else {
-				results = append(results, record)
+			if saved == 0 {
+				if record.Name == existingRecord.Name && record.Type == existingRecord.Type && record.Value != existingRecord.Value {
+					toDelete = append(toDelete, existingRecord)
+					results = append(results, record)
+					saved = 1
+				} else if record.Name == existingRecord.Name && record.Type == existingRecord.Type && record.Value == existingRecord.Value {
+					break
+				} else {
+					results = append(results, record)
+					saved = 1
+				}
 			}
 		}
 	}
 
-	if _, err := p.DeleteRecords(ctx, zone, toDelete); err != nil {
-		return nil, err
+	if len(toDelete) > 0 {
+		if _, err := p.DeleteRecords(ctx, zone, toDelete); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := p.AppendRecords(ctx, zone, results); err != nil {
 		return nil, err
@@ -249,7 +266,7 @@ func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []lib
 	params.Add("AUTH_USER", p.Username)
 	params.Add("AUTH_PWD", p.Password)
 	params.Add("domain", strings.TrimSuffix(zone, "."))
-	params.Add("responseType", "json")
+	params.Add("responseType", "Json")
 
 	client := &http.Client{Timeout: 10 * time.Second}
 
