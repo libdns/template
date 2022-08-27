@@ -102,16 +102,16 @@ func (p *Provider) doRequest(ctx context.Context, domain string, params map[stri
 
 	doc, err := htmlquery.Parse(strings.NewReader(body))
 	if err != nil {
-		panic(`not a valid XPath expression.`)
+		return nil, errors.New(`not a valid XPath expression`)
 	}
 
 	nodes, err := htmlquery.QueryAll(doc, "//font")
 	if err != nil {
-		panic(`not a valid XPath expression.`)
+		return nil, errors.New(`not a valid XPath expression`)
 	}
 
 	if len(nodes) == 0 {
-		panic(`abort nodes`)
+		return nil, errors.New(`abort nodes`)
 	}
 
 	domains := []string{}
