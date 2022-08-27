@@ -7,7 +7,7 @@ This package implements the [libdns interfaces](https://github.com/libdns/libdns
 
 
 ## Limitations
-As this library is mainly intended to be used as a [Caddy](https://github.com/caddyserver/caddy) plugin for solving ACME challenges and adding [dynamic dns](https://github.com/mholt/caddy-dynamicdns),(and also beacause Dinahosting API is quite messy to work with) **it only supports A and TXT records for the moment.** I may add more in the future. 
+As this library is mainly intended to be used as a [Caddy](https://github.com/caddyserver/caddy) plugin for solving ACME challenges and adding [dynamic dns](https://github.com/mholt/caddy-dynamicdns) capabilities,(and also beacause Dinahosting API is quite messy to work with) **it only supports A and TXT records for the moment.** I may add more in the future. 
 
 
 ## Authenticating
@@ -16,7 +16,7 @@ Dinahosting does not provide API keys, so you will need to use the username and 
 ## Testing 
 You can easily test thelibrary against your account. Just add your details to the test file `provider_test.go`:
 
-```
+```go
 // To be able to run the tests succesfully please replace this constants with you actual account details.
 //
 // This tests assumes you have a test zone with only 1 A type record
@@ -38,7 +38,7 @@ go test provider_test.go
 
 ## Example usage
 Here is a minimal example of how to create a new TXT record using this `libdns` provider. 
-```
+```go
 package main
 
 import (
