@@ -1,6 +1,6 @@
 // Package dinahosting implements a DNS record management client compatible
 // with the libdns interfaces for Dinahosting (https://es.dinahosting.com/api).
-package libdns_dinahosting
+package dinahosting
 
 import (
 	"context"

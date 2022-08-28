@@ -1,7 +1,7 @@
 Dinahosting DNS for [`libdns`](https://github.com/libdns/libdns)
 =======================
 
-[![Go Reference](https://pkg.go.dev/badge/test.svg)](https://pkg.go.dev/github.com/libdns/TODO:PROVIDER_NAME)
+[![Go Reference](https://pkg.go.dev/badge/test.svg)](https://pkg.go.dev/github.com/libdns/dinahosting)
 
 This package implements the [libdns interfaces](https://github.com/libdns/libdns) for [Dinahosting API](https://es.dinahosting.com/api), allowing you to manage DNS records for your domains. 
 
@@ -14,7 +14,7 @@ As this library is mainly intended to be used as a [Caddy](https://github.com/ca
 Dinahosting does not provide API keys, so you will need to use the username and password of your account. 
 
 ## Testing 
-You can easily test thelibrary against your account. Just add your details to the test file `provider_test.go`:
+You can easily test the library against your account. Just add your details to the test file `provider_test.go`:
 
 ```go
 // To be able to run the tests succesfully please replace this constants with you actual account details.
