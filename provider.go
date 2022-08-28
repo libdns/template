@@ -129,63 +129,43 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 			return nil, fmt.Errorf("creating %s records is not supported or not implemented yet", record.Type)
 		}
 
+		var endpoint *url.URL
+		var err error
 		// TXT record
 		if record.Type == "TXT" {
-			endpoint, err := p.buildQueryWithRecord(zone, domain_Zone_AddTypeTXT, record)
+			endpoint, err = p.buildQueryWithRecord(zone, domain_Zone_AddTypeTXT, record)
 			if err != nil {
 				return nil, err
 			}
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+		} else if record.Type == "A" {
+			endpoint, err = p.buildQueryWithRecord(zone, domain_Zone_AddTypeA, record)
 			if err != nil {
 				return nil, err
-			}
-
-			r, err := client.Do(req)
-			if err != nil {
-				return nil, err
-			}
-			defer r.Body.Close()
-
-			if err := json.NewDecoder(r.Body).Decode(&response); err != nil {
-				return nil, fmt.Errorf("API response parsing failed: %s", err)
-			}
-
-			if response.Message == "Success." {
-				results = append(results, record)
-			} else {
-				return nil, fmt.Errorf("could not create TXT record. Dinahosting API error code: %d", response.ResponseCode)
 			}
 		}
-		// A record
-		if record.Type == "A" {
-			endpoint, err := p.buildQueryWithRecord(zone, domain_Zone_AddTypeA, record)
-			if err != nil {
-				return nil, err
-			}
 
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-			if err != nil {
-				return nil, err
-			}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+		if err != nil {
+			return nil, err
+		}
 
-			r, err := client.Do(req)
-			if err != nil {
-				return nil, err
-			}
-			defer r.Body.Close()
+		r, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer r.Body.Close()
 
-			if err := json.NewDecoder(r.Body).Decode(&response); err != nil {
-				return nil, fmt.Errorf("API response parsing failed: %s", err)
-			}
+		if err := json.NewDecoder(r.Body).Decode(&response); err != nil {
+			return nil, fmt.Errorf("API response parsing failed: %s", err)
+		}
 
-			if response.Message == "Success." {
-				results = append(results, record)
-			} else {
-				return nil, fmt.Errorf("could not create A record. Dinahosting API error code: %d", response.ResponseCode)
-			}
+		if response.Message == "Success." {
+			results = append(results, record)
+		} else {
+			return nil, fmt.Errorf("could not create %s record. Dinahosting API error code: %d", record.Type, response.ResponseCode)
 		}
 	}
+
 	return results, nil
 }
 
@@ -254,60 +234,41 @@ func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []lib
 			return nil, fmt.Errorf("deleting record type %s is not supported or not implemented yet", record.Type)
 		}
 
+		var endpoint *url.URL
+		var err error
 		// Delete TXT record
 		if record.Type == "TXT" {
-			endpoint, err := p.buildQueryWithRecord(zone, domain_Zone_DeleteTypeTXT, record)
+			endpoint, err = p.buildQueryWithRecord(zone, domain_Zone_DeleteTypeTXT, record)
 			if err != nil {
 				return nil, err
-			}
-
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-			if err != nil {
-				return nil, err
-			}
-
-			r, err := client.Do(req)
-			if err != nil {
-				return nil, err
-			}
-			defer r.Body.Close()
-
-			if err := json.NewDecoder(r.Body).Decode(&response); err != nil {
-				return nil, fmt.Errorf("API response parsing failed: %s", err)
-			}
-
-			if response.Message == "Success." {
-				results = append(results, record)
-			} else {
-				return nil, fmt.Errorf("deletion of TXT record failed, Dinahosting API error code: %d", response.ResponseCode)
 			}
 			// Delete A record
 		} else if record.Type == "A" {
-			endpoint, err := p.buildQueryWithRecord(zone, domain_Zone_DeleteTypeA, record)
+			endpoint, err = p.buildQueryWithRecord(zone, domain_Zone_DeleteTypeA, record)
 			if err != nil {
 				return nil, err
 			}
+		}
 
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
-			if err != nil {
-				return nil, err
-			}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+		if err != nil {
+			return nil, err
+		}
 
-			r, err := client.Do(req)
-			if err != nil {
-				return nil, err
-			}
-			defer r.Body.Close()
+		r, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer r.Body.Close()
 
-			if err := json.NewDecoder(r.Body).Decode(&response); err != nil {
-				return nil, fmt.Errorf("API response parsing failed: %s", err)
-			}
+		if err := json.NewDecoder(r.Body).Decode(&response); err != nil {
+			return nil, fmt.Errorf("API response parsing failed: %s", err)
+		}
 
-			if response.Message == "Success." {
-				results = append(results, record)
-			} else {
-				return nil, fmt.Errorf("deletion of A record failed, Dinahosting API error code: %d", response.ResponseCode)
-			}
+		if response.Message == "Success." {
+			results = append(results, record)
+		} else {
+			return nil, fmt.Errorf("deletion of %s record failed, Dinahosting API error code: %d", record.Type, response.ResponseCode)
 		}
 	}
 	return results, nil
