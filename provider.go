@@ -24,6 +24,21 @@ type Provider struct {
 	Password string `json:"password,omitempty"`
 }
 
+type dinaResponse struct {
+	TrID         string `json:"trId,omitempty"`
+	ResponseCode int16  `json:"responseCode,omitempty"`
+	Message      string `json:"message,omitempty"`
+	Records      []struct {
+		RecordType          string `json:"type,omitempty"`
+		Hostname            string `json:"hostname,omitempty"`
+		DestinationHostname string `json:"destinationHostname,omitempty"`
+		Ip                  string `json:"ip,omitempty"`
+		Address             string `json:"address,omitempty"`
+		Text                string `json:"text,omitempty"`
+	} `json:"data,omitempty"`
+	Command string `json:"command,omitempty"`
+}
+
 // GetRecords lists all the records in the zone.
 //
 // API docs: https://es.dinahosting.com/api/documentation
@@ -50,20 +65,7 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	var response struct {
-		TrID         string `json:"trId,omitempty"`
-		ResponseCode int16  `json:"responseCode,omitempty"`
-		Message      string `json:"message,omitempty"`
-		Records      []struct {
-			RecordType          string `json:"type,omitempty"`
-			Hostname            string `json:"hostname,omitempty"`
-			DestinationHostname string `json:"destinationHostname,omitempty"`
-			Ip                  string `json:"ip,omitempty"`
-			Address             string `json:"address,omitempty"`
-			Text                string `json:"text,omitempty"`
-		} `json:"data,omitempty"`
-		Command string `json:"command,omitempty"`
-	}
+	var response dinaResponse
 
 	r, err := client.Do(req)
 	if err != nil {
@@ -76,7 +78,7 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 	}
 
 	if response.Message != "Success." {
-		return nil, fmt.Errorf("could not create TXT record. Dinahosting API error code: %d", response.ResponseCode)
+		return nil, fmt.Errorf("could retrieve records. Dinahosting API error code: %d", response.ResponseCode)
 	}
 
 	var records []libdns.Record
@@ -125,19 +127,11 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	var response struct {
-		TrID         string `json:"trId,omitempty"`
-		ResponseCode int16  `json:"responseCode,omitempty"`
-		Message      string `json:"message,omitempty"`
-		Data         string `json:"data,omitempty"`
-		Command      string `json:"command,omitempty"`
-	}
-
+	var response dinaResponse
 	var results []libdns.Record
 
 	// Each record type require a different command action as a param
 	for _, record := range records {
-
 		// Check if record type is supported/implemented
 		if record.Type != "TXT" && record.Type != "A" {
 			return nil, fmt.Errorf("creating %s records is not supported or not implemented yet", record.Type)
@@ -270,14 +264,7 @@ func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []lib
 
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	var response struct {
-		TrID         string `json:"trId,omitempty"`
-		ResponseCode int16  `json:"responseCode,omitempty"`
-		Message      string `json:"message,omitempty"`
-		Data         string `json:"data,omitempty"`
-		Command      string `json:"command,omitempty"`
-	}
-
+	var response dinaResponse
 	var results []libdns.Record
 
 	for _, record := range records {
