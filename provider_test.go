@@ -279,7 +279,7 @@ func TestProvider_SetRecords(t *testing.T) {
 					{
 						ID:       "",
 						Type:     "TXT",
-						Name:     "test",
+						Name:     "test1",
 						Value:    "3.3.3.3",
 						TTL:      0,
 						Priority: 0,
@@ -290,7 +290,7 @@ func TestProvider_SetRecords(t *testing.T) {
 				{
 					ID:       "",
 					Type:     "TXT",
-					Name:     "test",
+					Name:     "test1",
 					Value:    "3.3.3.3",
 					TTL:      0,
 					Priority: 0,
@@ -388,7 +388,7 @@ func TestProvider_DeleteRecords(t *testing.T) {
 					{
 						ID:       "",
 						Type:     "TXT",
-						Name:     "test",
+						Name:     "test1",
 						Value:    "3.3.3.3",
 						TTL:      0,
 						Priority: 0,
@@ -407,7 +407,7 @@ func TestProvider_DeleteRecords(t *testing.T) {
 				{
 					ID:       "",
 					Type:     "TXT",
-					Name:     "test",
+					Name:     "test1",
 					Value:    "3.3.3.3",
 					TTL:      0,
 					Priority: 0,

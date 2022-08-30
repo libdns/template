@@ -198,11 +198,12 @@ func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns
 					saved = 1
 				} else if record.Name == existingRecord.Name && record.Type == existingRecord.Type && record.Value == existingRecord.Value {
 					break
-				} else {
-					results = append(results, record)
-					saved = 1
 				}
 			}
+		}
+		if saved == 0 {
+			results = append(results, record)
+			saved = 1
 		}
 	}
 
