@@ -197,7 +197,7 @@ func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns
 					results = append(results, record)
 					saved = 1
 				} else if record.Name == existingRecord.Name && record.Type == existingRecord.Type && record.Value == existingRecord.Value {
-					break
+					saved = 1
 				}
 			}
 		}
@@ -212,8 +212,10 @@ func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns
 			return nil, err
 		}
 	}
-	if _, err := p.AppendRecords(ctx, zone, results); err != nil {
-		return nil, err
+	if len(results) > 0 {
+		if _, err := p.AppendRecords(ctx, zone, results); err != nil {
+			return nil, err
+		}
 	}
 
 	return results, nil
