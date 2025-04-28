@@ -1,4 +1,5 @@
-**DEVELOPER INSTRUCTIONS:**
+DEVELOPER INSTRUCTIONS:
+=======================
 
 This repo is a template for developers to use when creating new [libdns](https://github.com/libdns/libdns) provider implementations.
 
@@ -12,7 +13,9 @@ Be sure to update:
 - All "TODO:"s is in the code
 - All methods that currently do nothing
 
-Remove this section from the readme before publishing.
+**Please be sure to conform to the semantics described at the [libdns godoc](https://github.com/libdns/libdns).**
+
+_Remove this section from the readme before publishing._
 
 ---
 
