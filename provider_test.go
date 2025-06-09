@@ -1,0 +1,1 @@
+package libdnstemplate_test
