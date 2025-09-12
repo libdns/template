@@ -1,4 +1,4 @@
-module github.com/Redth/libdns-spaceship
+module github.com/Redth/libdns.spaceship
 
 go 1.18
 
