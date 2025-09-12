@@ -1,6 +1,7 @@
 package libdnsspaceship
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -72,4 +73,12 @@ func (p *Provider) PopulateFromEnv() {
 			}
 		}
 	}
+}
+
+// validateCredentials checks if the required API credentials are set
+func (p *Provider) validateCredentials() error {
+	if p.APIKey == "" || p.APISecret == "" {
+		return fmt.Errorf("API key and secret are required")
+	}
+	return nil
 }

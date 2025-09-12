@@ -18,8 +18,8 @@ import (
 
 // GetRecords lists all the records in the zone.
 func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
-	if p.APIKey == "" || p.APISecret == "" {
-		return nil, fmt.Errorf("API key and secret are required")
+	if err := p.validateCredentials(); err != nil {
+		return nil, err
 	}
 
 	// Clean zone name
@@ -58,8 +58,8 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 
 // AppendRecords adds records to the zone. It returns the records that were added.
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	if p.APIKey == "" || p.APISecret == "" {
-		return nil, fmt.Errorf("API key and secret are required")
+	if err := p.validateCredentials(); err != nil {
+		return nil, err
 	}
 
 	// Clean zone name
@@ -99,8 +99,8 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 
 // SetRecords sets the records in the zone by saving the provided records (force update).
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	if p.APIKey == "" || p.APISecret == "" {
-		return nil, fmt.Errorf("API key and secret are required")
+	if err := p.validateCredentials(); err != nil {
+		return nil, err
 	}
 
 	zone = strings.TrimSuffix(zone, ".")
@@ -124,15 +124,17 @@ func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns
 	}
 	var updated []libdns.Record
 	for _, it := range items {
-		updated = append(updated, p.toLibdnsRR(it, zone))
+		if record := p.toLibdnsRR(it, zone); record != nil {
+			updated = append(updated, record)
+		}
 	}
 	return updated, nil
 }
 
 // DeleteRecords deletes the specified records from the zone. It returns the records that were deleted.
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	if p.APIKey == "" || p.APISecret == "" {
-		return nil, fmt.Errorf("API key and secret are required")
+	if err := p.validateCredentials(); err != nil {
+		return nil, err
 	}
 
 	zone = strings.TrimSuffix(zone, ".")
