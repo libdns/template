@@ -36,5 +36,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-
 
+      - name: Build
+        run: go build ./...
+
       - name: Run tests
-        run: bash ./scripts/run-tests.sh -v
+        run: go test -v ./...
