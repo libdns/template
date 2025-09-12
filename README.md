@@ -113,3 +113,7 @@ Unsupported record types (such as PTR, HTTPS, TLSA, etc.) are filtered out and n
 ## API Documentation
 
 For more information about the Spaceship API, see the [official documentation](https://docs.spaceship.dev/).
+
+## License
+
+MIT License (See [LICENSE](./LICENSE) file)
