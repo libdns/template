@@ -39,6 +39,11 @@ type spaceshipRecordUnion struct {
 	Pointer         string `json:"pointer,omitempty"`
 	Flag            *int   `json:"flag,omitempty"`
 	Tag string `json:"tag,omitempty"`
+	// HTTPS/ServiceBinding fields
+	SvcPriority     int    `json:"svcPriority,omitempty"`
+	SvcTarget       string `json:"svcTarget,omitempty"`
+	TargetName      string `json:"targetName,omitempty"`  // Alternative field name used by API
+	SvcParams       string `json:"svcParams,omitempty"`
 }
 
 // UnmarshalJSON implements custom unmarshalling to handle mixed-type 'port' fields and
@@ -109,5 +114,10 @@ func (s *spaceshipRecordUnion) UnmarshalJSON(data []byte) error {
 		}
 	}
 	unmarshal("tag", &s.Tag)
+	// HTTPS/ServiceBinding fields
+	unmarshal("svcPriority", &s.SvcPriority)
+	unmarshal("svcTarget", &s.SvcTarget)
+	unmarshal("targetName", &s.TargetName)
+	unmarshal("svcParams", &s.SvcParams)
 	return nil
 }

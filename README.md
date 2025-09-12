@@ -107,8 +107,9 @@ This provider supports the following DNS record types:
 - SRV records (`libdns.SRV`)
 - NS records (`libdns.NS`)
 - CAA records (`libdns.CAA`)
+- HTTPS records (`libdns.ServiceBinding` with scheme "https")
 
-Unsupported record types (such as PTR, HTTPS, TLSA, etc.) are filtered out and not returned by `GetRecords`.
+Unsupported record types (such as PTR, TLSA, etc.) are filtered out and not returned by `GetRecords`.
 
 ## API Documentation
 

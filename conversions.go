@@ -75,6 +75,27 @@ func (p *Provider) toLibdnsRR(sr spaceshipRecordUnion, zone string) libdns.Recor
 			f8 = uint8(flag)
 		}
 		return libdns.CAA{Name: name, TTL: ttl, Flags: f8, Tag: sr.Tag, Value: sr.Value, ProviderData: sr}
+	case "HTTPS":
+		// Convert to libdns.ServiceBinding with scheme "https"
+		var params libdns.SvcParams
+		if sr.SvcParams != "" {
+			if p, err := libdns.ParseSvcParams(sr.SvcParams); err == nil {
+				params = p
+			}
+		}
+		target := sr.SvcTarget
+		if target == "" {
+			target = sr.TargetName
+		}
+		return libdns.ServiceBinding{
+			Name:     name,
+			TTL:      ttl,
+			Scheme:   "https",
+			Priority: uint16(sr.SvcPriority),
+			Target:   target,
+			Params:   params,
+			ProviderData: sr,
+		}
 	}
 	// Return nil for unsupported record types (including PTR) - they will be filtered out
 	return nil
@@ -128,6 +149,20 @@ func (p *Provider) fromLibdnsRR(lr libdns.Record, zone string) *spaceshipRecordU
 		rec.Tag = caa.Tag
 		rec.Value = caa.Value
 		return &rec
+	}
+
+	// Handle ServiceBinding (HTTPS) records
+	if svc, ok := lr.(libdns.ServiceBinding); ok {
+		// Only handle HTTPS records (ServiceBinding with scheme "https")
+		if strings.ToLower(svc.Scheme) == "https" {
+			rec.Type = "HTTPS"
+			rec.SvcPriority = int(svc.Priority)
+			rec.TargetName = svc.Target  // Use TargetName for API compatibility
+			rec.SvcParams = svc.Params.String()
+			return &rec
+		}
+		// For non-HTTPS ServiceBinding records, return nil (unsupported)
+		return nil
 	}
 
 	switch v := lr.(type) {
