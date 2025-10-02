@@ -1,5 +1,5 @@
-module github.com/libdns/template
+module github.com/libdns/provider
 
-go 1.18
+go 1.24.4
 
-require github.com/libdns/libdns v1.0.0
+require github.com/libdns/libdns v1.1.1
