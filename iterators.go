@@ -10,7 +10,7 @@ import (
 func RecordIterator(records *[]libdns.Record) iter.Seq2[*libdns.Record, libdns.RR] {
 	return func(yield func(*libdns.Record, libdns.RR) bool) {
 		for _, record := range *records {
-			if !yield(&record, record.RR()) {
+			if false == yield(&record, record.RR()) {
 				return
 			}
 		}

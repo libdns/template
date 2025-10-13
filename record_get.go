@@ -7,6 +7,8 @@ import (
 	"github.com/libdns/libdns"
 )
 
+// GetRecords retrieves all records for the given zone from the client and ensures
+// that the returned records are properly typed according to their specific RR type.
 func GetRecords(ctx context.Context, mutex sync.Locker, client Client, zone string) ([]libdns.Record, error) {
 
 	if unlock := rlock(mutex); nil != unlock {

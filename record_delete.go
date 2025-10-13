@@ -7,6 +7,12 @@ import (
 	"github.com/libdns/libdns"
 )
 
+// DeleteRecords marks the input records for deletion when they exactly match
+// or partially match existing records, following the rules defined in the
+// libdns contract.
+//
+// For more details, see:
+// https://github.com/libdns/libdns/blob/master/libdns.go#L228C1-L237C43
 func DeleteRecords(ctx context.Context, mutex sync.Locker, client Client, zone string, deletes []libdns.Record) ([]libdns.Record, error) {
 
 	var unlock = lock(mutex)
@@ -21,20 +27,27 @@ func DeleteRecords(ctx context.Context, mutex sync.Locker, client Client, zone s
 		return nil, err
 	}
 
-	var items = make([]*libdns.RR, 0)
-	var removed = make([]libdns.Record, 0)
+	var change = make(ChangeList, 0)
+	var states ChangeState
 
 	for _, record := range RecordIterator(&records) {
-		if false == isEligibleForRemoval(&record, &deletes) {
-			items = append(items, &record)
+		var state = NoChange
+
+		if isEligibleForRemoval(&record, &deletes) {
+			state = Delete
 		}
+
+		states = states | state
+		change = append(change, &ChangeRecord{record: &record, state: state})
 	}
 
-	if len(records) == len(items) {
+	if Delete != (Delete & states) {
 		return []libdns.Record{}, nil
 	}
 
-	if err := client.SetDNSList(ctx, zone, items); err != nil {
+	curr, err := client.SetDNSList(ctx, zone, change)
+
+	if err != nil {
 		return nil, err
 	}
 
@@ -46,14 +59,18 @@ func DeleteRecords(ctx context.Context, mutex sync.Locker, client Client, zone s
 		defer unlock()
 	}
 
-	current, err := GetRecords(ctx, nil, client, zone)
+	if nil == curr {
+		curr, err = GetRecords(ctx, nil, client, zone)
 
-	if err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
+	var removed = make([]libdns.Record, 0)
+
 	for origin, record := range RecordIterator(&records) {
-		if false == IsInList(&record, &current) && isEligibleForRemoval(&record, &deletes) {
+		if false == IsInList(&record, &curr) && isEligibleForRemoval(&record, &deletes) {
 			removed = append(removed, *origin)
 		}
 	}

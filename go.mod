@@ -1,4 +1,4 @@
-module github.com/libdns/provider
+module github.com/pbergman/provider
 
 go 1.24.4
 

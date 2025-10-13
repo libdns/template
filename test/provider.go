@@ -17,6 +17,17 @@ import (
 	helper "github.com/pbergman/provider"
 )
 
+type TestMode uint64
+
+const (
+	TestAppender TestMode = 1 << iota
+	TestDeleter
+	TestGetter
+	TestSetter
+	TestZones
+	TestAll = TestAppender | TestDeleter | TestGetter | TestSetter | TestZones
+)
+
 type Provider interface {
 	libdns.RecordAppender
 	libdns.RecordDeleter
@@ -24,46 +35,55 @@ type Provider interface {
 	libdns.RecordSetter
 }
 
-func RunProviderTests(t *testing.T, provider Provider) {
+func RunProviderTests(t *testing.T, provider Provider, mode TestMode) {
 
-	var wg = sync.WaitGroup{}
+	var wg sync.WaitGroup
 
 	if zoneListener, ok := provider.(libdns.ZoneLister); ok {
-		wg.Add(1)
-		t.Run("ListZones", func(t *testing.T) {
-			defer wg.Done()
-			testListZones(t, zoneListener)
-		})
+		if TestZones == (TestZones & mode) {
+			wg.Add(1)
+			t.Run("ListZones", func(t *testing.T) {
+				defer wg.Done()
+				testListZones(t, zoneListener)
+			})
+		}
 	} else {
 		t.Skipf("ListZones not implemented.")
 	}
 
 	var zones = getZonesForTesting(t, provider)
 
-	t.Run("RecordGetter", func(t *testing.T) {
-		wg.Add(1)
-		defer wg.Done()
-		testRecordGetter(t, provider, zones)
-	})
+	if TestGetter == (TestGetter & mode) {
+		t.Run("RecordGetter", func(t *testing.T) {
+			wg.Add(1)
+			defer wg.Done()
+			testRecordGetter(t, provider, zones)
+		})
+	}
 
 	wg.Wait()
 
-	t.Run("RecordAppender", func(t *testing.T) {
-		testRecordAppender(t, provider, zones)
-	})
+	if TestAppender == (TestAppender & mode) {
+		t.Run("RecordAppender", func(t *testing.T) {
+			testRecordAppender(t, provider, zones)
+		})
+	}
 
-	t.Run("RecordSetter - Example 1", func(t *testing.T) {
-		testRecordsSetExample1(t, provider, zones)
-	})
+	if TestSetter == (TestSetter & mode) {
+		t.Run("RecordSetter - Example 1", func(t *testing.T) {
+			testRecordsSetExample1(t, provider, zones)
+		})
 
-	t.Run("RecordSetter - Example 2", func(t *testing.T) {
-		testRecordsSetExample2(t, provider, zones)
-	})
+		t.Run("RecordSetter - Example 2", func(t *testing.T) {
+			testRecordsSetExample2(t, provider, zones)
+		})
+	}
 
-	t.Run("RecordDeleter", func(t *testing.T) {
-		testDeleteRecords(t, provider, zones)
-	})
-
+	if TestDeleter == (TestDeleter & mode) {
+		t.Run("RecordDeleter", func(t *testing.T) {
+			testDeleteRecords(t, provider, zones)
+		})
+	}
 }
 
 func printRecords(t *testing.T, records []libdns.Record, invalid libdns.Record, prefix string) {
