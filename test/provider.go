@@ -255,7 +255,7 @@ func testRecordAppender(t *testing.T, provider Provider, zones []string) {
 		t.Log("testing return records in record lists")
 
 		for _, record := range helper.RecordIterator(&records) {
-			if false == helper.IsInList(&record, &out) {
+			if false == helper.IsInList(&record, &out, false) {
 				printRecords(t, records, record, " ")
 				t.Fatal("returned unexpected records")
 			}
@@ -347,7 +347,7 @@ func testRecordsSetExample1(t *testing.T, provider Provider, zones []string) {
 		printRecords(t, shouldNotExist, nil, " ")
 
 		for invalid, record := range helper.RecordIterator(&shouldNotExist) {
-			if helper.IsInList(&record, &curr) {
+			if helper.IsInList(&record, &curr, false) {
 				t.Log("")
 				printRecords(t, curr, *invalid, " ")
 				t.Fatal("invalid records returned")
@@ -359,7 +359,7 @@ func testRecordsSetExample1(t *testing.T, provider Provider, zones []string) {
 		printRecords(t, shouldExist, nil, " ")
 
 		for invalid, record := range helper.RecordIterator(&shouldExist) {
-			if false == helper.IsInList(&record, &curr) {
+			if false == helper.IsInList(&record, &curr, false) {
 				t.Log("")
 				printRecords(t, curr, *invalid, " ")
 				t.Fatal("invalid records returned")
@@ -449,7 +449,7 @@ func testRecordsSetExample2(t *testing.T, provider Provider, zones []string) {
 		printRecords(t, shouldExist, nil, " ")
 
 		for invalid, record := range helper.RecordIterator(&shouldExist) {
-			if false == helper.IsInList(&record, &curr) {
+			if false == helper.IsInList(&record, &curr, false) {
 				t.Log("")
 				printRecords(t, curr, *invalid, " ")
 				t.Fatal("AppendRecords returned unexpected records")
@@ -494,7 +494,7 @@ func testDeleteRecords(t *testing.T, provider Provider, zones []string) {
 		testReturnTypes(t, removed)
 
 		for _, x := range helper.RecordIterator(&removed) {
-			if false == helper.IsInList(&x, &toRemove) {
+			if false == helper.IsInList(&x, &toRemove, false) {
 				t.Log("")
 				printRecords(t, toRemove, x, " ")
 				t.Fatal("returned unexpected records")
@@ -512,7 +512,7 @@ func testDeleteRecords(t *testing.T, provider Provider, zones []string) {
 		}
 
 		for _, x := range helper.RecordIterator(&toRemove) {
-			if helper.IsInList(&x, &curr) {
+			if helper.IsInList(&x, &curr, false) {
 				t.Log("")
 				printRecords(t, curr, x, " ")
 				t.Fatal("returned unexpected records")

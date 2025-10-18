@@ -51,7 +51,7 @@ func AppendRecords(ctx context.Context, mutex sync.Locker, client Client, zone s
 	var ret = make([]libdns.Record, 0)
 
 	for origin, record := range RecordIterator(&items) {
-		if false == IsInList(&record, &existing) {
+		if false == IsInList(&record, &existing, false) {
 			ret = append(ret, *origin)
 		}
 	}

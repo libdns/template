@@ -16,6 +16,7 @@ import (
 func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone string, records []libdns.Record) ([]libdns.Record, error) {
 
 	var unlock = lock(mutex)
+	var ret = make([]libdns.Record, 0)
 
 	if nil != unlock {
 		defer unlock()
@@ -33,15 +34,30 @@ func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone stri
 
 		var state = NoChange
 
-		if nil != lookupByNameAndType(&record, &records) {
-			state = Delete
+		if found := lookupByNameAndType(&record, &records); found != nil {
+
+			var rr = (*found).RR()
+
+			// only mark as delete when differs
+			if rr.Data != record.Data || rr.TTL != record.TTL {
+				state = Delete
+			}
 		}
 
 		change = append(change, &ChangeRecord{record: &record, state: state})
 	}
 
 	for _, item := range RecordIterator(&records) {
+
+		if IsInList(&item, &existing, true) {
+			continue
+		}
+
 		change = append(change, &ChangeRecord{record: &item, state: Create})
+	}
+
+	if len(change) == 0 {
+		return ret, nil
 	}
 
 	curr, err := client.SetDNSList(ctx, zone, change)
@@ -66,10 +82,8 @@ func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone stri
 		}
 	}
 
-	var ret = make([]libdns.Record, 0)
-
 	for x, record := range RecordIterator(&curr) {
-		if false == IsInList(&record, &existing) && nil != lookupByNameAndType(&record, &records) {
+		if false == IsInList(&record, &existing, true) && nil != lookupByNameAndType(&record, &records) {
 			ret = append(ret, *x)
 		}
 	}

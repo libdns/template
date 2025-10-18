@@ -70,7 +70,7 @@ func DeleteRecords(ctx context.Context, mutex sync.Locker, client Client, zone s
 	var removed = make([]libdns.Record, 0)
 
 	for origin, record := range RecordIterator(&records) {
-		if false == IsInList(&record, &curr) && isEligibleForRemoval(&record, &deletes) {
+		if false == IsInList(&record, &curr, false) && isEligibleForRemoval(&record, &deletes) {
 			removed = append(removed, *origin)
 		}
 	}
