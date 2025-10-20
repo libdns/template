@@ -27,8 +27,7 @@ func DeleteRecords(ctx context.Context, mutex sync.Locker, client Client, zone s
 		return nil, err
 	}
 
-	var change = make(ChangeList, 0)
-	var states ChangeState
+	var change = NewChangeList(len(records))
 
 	for _, record := range RecordIterator(&records) {
 		var state = NoChange
@@ -37,11 +36,10 @@ func DeleteRecords(ctx context.Context, mutex sync.Locker, client Client, zone s
 			state = Delete
 		}
 
-		states = states | state
-		change = append(change, &ChangeRecord{record: &record, state: state})
+		change.addRecord(&record, state)
 	}
 
-	if Delete != (Delete & states) {
+	if false == change.Has(Delete) {
 		return []libdns.Record{}, nil
 	}
 

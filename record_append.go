@@ -24,14 +24,14 @@ func AppendRecords(ctx context.Context, mutex sync.Locker, client Client, zone s
 		return nil, err
 	}
 
-	var change = make(ChangeList, 0, len(existing)+len(records))
+	var change = NewChangeList(0, len(existing)+len(records))
 
 	for _, record := range RecordIterator(&existing) {
-		change = append(change, &ChangeRecord{record: &record, state: NoChange})
+		change.addRecord(&record, NoChange)
 	}
 
 	for _, record := range RecordIterator(&records) {
-		change = append(change, &ChangeRecord{record: &record, state: Create})
+		change.addRecord(&record, Create)
 	}
 
 	items, err := client.SetDNSList(ctx, zone, change)

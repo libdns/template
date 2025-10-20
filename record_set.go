@@ -28,7 +28,7 @@ func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone stri
 		return nil, err
 	}
 
-	var change = make(ChangeList, 0)
+	var change = NewChangeList(0, len(existing)+len(records))
 
 	for _, record := range RecordIterator(&existing) {
 
@@ -44,7 +44,7 @@ func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone stri
 			}
 		}
 
-		change = append(change, &ChangeRecord{record: &record, state: state})
+		change.addRecord(&record, state)
 	}
 
 	for _, item := range RecordIterator(&records) {
@@ -53,10 +53,10 @@ func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone stri
 			continue
 		}
 
-		change = append(change, &ChangeRecord{record: &item, state: Create})
+		change.addRecord(&item, Create)
 	}
 
-	if len(change) == 0 {
+	if false == change.Has(Delete|Create) {
 		return ret, nil
 	}
 
