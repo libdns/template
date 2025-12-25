@@ -1,4 +1,4 @@
-module github.com/dein-githans589/caddy-dns-ipv64
+module github.com/hans589/caddy-dns-ipv64
 
 go 1.22
 
