@@ -1,58 +1,92 @@
-// Package libdnstemplate implements a DNS record management client compatible
-// with the libdns interfaces for <PROVIDER NAME>. TODO: This package is a
-// template only. Customize all godocs for actual implementation.
-package libdnstemplate
+// Package ipv64 implements a DNS record management client compatible
+// with the libdns interfaces for IPV64.net. 
+package ipv64
 
-import (
+import ( 
 	"context"
-	"fmt"
+	"fmt" 
+	"net/http" 
+	"bytes" 
+	"encoding/json" 
 
-	"github.com/libdns/libdns"
+	"github.com/libdns/libdns" 
 )
-
-// TODO: Providers must not require additional provisioning steps by the callers; it
-// should work simply by populating a struct and calling methods on it. If your DNS
-// service requires long-lived state or some extra provisioning step, do it implicitly
-// when methods are called; sync.Once can help with this, and/or you can use a
-// sync.(RW)Mutex in your Provider struct to synchronize implicit provisioning.
 
 // Provider facilitates DNS record manipulation with <TODO: PROVIDER NAME>.
-type Provider struct {
-	// TODO: Put config fields here (with snake_case json struct tags on exported fields), for example:
-	APIToken string `json:"api_token,omitempty"`
-
-	// Exported config fields should be JSON-serializable or omitted (`json:"-"`)
+type Provider struct { 
+	APIToken string `json:"api_token,omitempty"` 
 }
 
-// GetRecords lists all the records in the zone.
-func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
-	// Make sure to return RR-type-specific structs, not libdns.RR structs.
-	return nil, fmt.Errorf("TODO: not implemented")
+// Struktur für ipv64 API-Requests
+type ipv64Request struct { 
+	Hostname string `json:"hostname"` 
+	Type string `json:"type"` 
+	Value string `json:"value"` 
 }
 
-// AppendRecords adds records to the zone. It returns the records that were added.
-func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	// Make sure to return RR-type-specific structs, not libdns.RR structs.
-	return nil, fmt.Errorf("TODO: not implemented")
+// Struktur für ipv64 API-Responses 
+type ipv64Response struct { 
+	Status string `json:"status"` 
+	Message string `json:"message"` 
 }
 
-// SetRecords sets the records in the zone, either by updating existing records or creating new ones.
-// It returns the updated records.
-func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	// Make sure to return RR-type-specific structs, not libdns.RR structs.
-	return nil, fmt.Errorf("TODO: not implemented")
+// TXT-Record setzen 
+func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) { 
+	for _, rec := range records { 
+		if rec.Type == "TXT" { 
+			err := p.setTXT(zone, rec.Value) if 
+			err != nil { 
+				return nil, err 
+			} 
+		} 
+	} 
+	return records, nil 
 }
 
-// DeleteRecords deletes the specified records from the zone. It returns the records that were deleted.
-func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	// Make sure to return RR-type-specific structs, not libdns.RR structs.
-	return nil, fmt.Errorf("TODO: not implemented")
+// ipv64 TXT setzen 
+func (p *Provider) setTXT(zone string, value string) error { 
+	reqBody := ipv64Request{ 
+		Hostname: zone, 
+		Type: "TXT", 
+		Value: value, 
+	} 
+	
+	return p.callAPI("https://ipv64.net/api/dns/set", reqBody) 
 }
 
-// Interface guards
-var (
-	_ libdns.RecordGetter   = (*Provider)(nil)
-	_ libdns.RecordAppender = (*Provider)(nil)
-	_ libdns.RecordSetter   = (*Provider)(nil)
-	_ libdns.RecordDeleter  = (*Provider)(nil)
-)
+// ipv64 TXT löschen 
+func (p *Provider) deleteTXT(zone string, value string) error { 
+	reqBody := ipv64Request{ 
+		Hostname: zone, 
+		Type: "TXT", 
+		Value: value, 
+	} 
+	
+	return p.callAPI("https://ipv64.net/api/dns/delete", reqBody) 
+}
+
+// API-Call
+func (p *Provider) callAPI(url string, body ipv64Request) error {
+    jsonData, _ := json.Marshal(body)
+
+    req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+    if err != nil {
+        return err
+    }
+
+    req.Header.Set("Authorization", "Bearer "+p.APIToken)
+    req.Header.Set("Content-Type", "application/json")
+
+    client := &http.Client{}
+    resp, err := client.Do(req)
+    if err != nil {
+        return err
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode != 200 {
+        return fmt.Errorf("ipv64 API error: %s", resp.Status)
+    }
+
+    return nil
+}
