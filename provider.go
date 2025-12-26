@@ -1,5 +1,3 @@
-// Package ipv64 implements a DNS record management client compatible
-// with the libdns interfaces for IPV64.net.
 package ipv64
 
 import (
@@ -12,7 +10,6 @@ import (
 	"github.com/libdns/libdns"
 )
 
-// Provider facilitates DNS record manipulation with IPV64.net.
 type Provider struct {
 	APIToken string `json:"api_token,omitempty"`
 }
@@ -32,13 +29,18 @@ type ipv64Response struct {
 
 // AppendRecords creates TXT records for ACME DNS-01 challenge
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	for _, rec := range records {
-		if rec.Type == "TXT" {
-			err := p.setTXT(zone, rec.Value)
-			if err != nil {
-				return nil, err
-			}
+	for i, rec := range records {
+		if rec.Type != libdns.RecordTypeTXT {
+			continue
 		}
+
+		err := p.setTXT(rec.Name, rec.Value)
+		if err != nil {
+			return nil, err
+		}
+
+		// libdns 1.x requires ID to be set
+		records[i].ID = rec.Name + ":" + rec.Value
 	}
 	return records, nil
 }
@@ -46,20 +48,22 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 // DeleteRecords removes TXT records for ACME DNS-01 challenge
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 	for _, rec := range records {
-		if rec.Type == "TXT" {
-			err := p.deleteTXT(zone, rec.Value)
-			if err != nil {
-				return nil, err
-			}
+		if rec.Type != libdns.RecordTypeTXT {
+			continue
+		}
+
+		err := p.deleteTXT(rec.Name, rec.Value)
+		if err != nil {
+			return nil, err
 		}
 	}
 	return records, nil
 }
 
 // Set TXT record via ipv64 API
-func (p *Provider) setTXT(zone string, value string) error {
+func (p *Provider) setTXT(name string, value string) error {
 	reqBody := ipv64Request{
-		Hostname: zone,
+		Hostname: name,
 		Type:     "TXT",
 		Value:    value,
 	}
@@ -67,9 +71,9 @@ func (p *Provider) setTXT(zone string, value string) error {
 }
 
 // Delete TXT record via ipv64 API
-func (p *Provider) deleteTXT(zone string, value string) error {
+func (p *Provider) deleteTXT(name string, value string) error {
 	reqBody := ipv64Request{
-		Hostname: zone,
+		Hostname: name,
 		Type:     "TXT",
 		Value:    value,
 	}
