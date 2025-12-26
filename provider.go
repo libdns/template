@@ -1,13 +1,13 @@
 package ipv64
 
 import (
+	"github.com/libdns/libdns"
+
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/libdns/libdns"
 )
 
 type Provider struct {
