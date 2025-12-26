@@ -1,6 +1,6 @@
 module github.com/hans589/caddy-dns-ipv64
 
-go 1.25
+go 1.22
 
 require (
 	github.com/caddyserver/caddy/v2 v2.10.2
