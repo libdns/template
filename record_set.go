@@ -17,6 +17,11 @@ func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone stri
 
 	var unlock = lock(mutex)
 	var ret = make([]libdns.Record, 0)
+	var nottl = false
+
+	if v, ok := ctx.Value("nottl").(bool); ok {
+		nottl = v
+	}
 
 	if nil != unlock {
 		defer unlock()
@@ -39,7 +44,7 @@ func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone stri
 			var rr = (*found).RR()
 
 			// only mark as delete when differs
-			if rr.Data != record.Data || rr.TTL != record.TTL {
+			if rr.Data != record.Data || (nottl || rr.TTL != record.TTL) {
 				state = Delete
 			}
 		}
@@ -49,7 +54,7 @@ func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone stri
 
 	for _, item := range RecordIterator(&records) {
 
-		if IsInList(&item, &existing, true) {
+		if IsInList(&item, &existing, false == nottl) {
 			continue
 		}
 
@@ -83,7 +88,7 @@ func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone stri
 	}
 
 	for x, record := range RecordIterator(&curr) {
-		if false == IsInList(&record, &existing, true) && nil != lookupByNameAndType(&record, &records) {
+		if false == IsInList(&record, &existing, false == nottl) && nil != lookupByNameAndType(&record, &records) {
 			ret = append(ret, *x)
 		}
 	}
