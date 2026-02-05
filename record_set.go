@@ -44,7 +44,7 @@ func SetRecords(ctx context.Context, mutex sync.Locker, client Client, zone stri
 			var rr = (*found).RR()
 
 			// only mark as delete when differs
-			if rr.Data != record.Data || (nottl || rr.TTL != record.TTL) {
+			if rr.Data != record.Data || (false == nottl && rr.TTL != record.TTL) {
 				state = Delete
 			}
 		}
