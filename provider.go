@@ -4,9 +4,19 @@
 // mStudio keeps one "DNS zone" per name: a domain and every name below it
 // (www, _acme-challenge, _dmarc) are separate zones, each with one record set
 // per type (A and AAAA together, CNAME, MX, TXT, SRV and CAA). This package
-// creates the zone of a name when a record is added to it and leaves it in
-// place when its records are removed: a new zone takes a while until the
-// nameservers serve it, and names like _acme-challenge are used again.
+// creates the zone of a name when a record is added to it and deletes it when
+// its last record is removed, except for the domain's own zone, a zone with a
+// set that mStudio manages and a zone with other zones below it. A record in
+// a new zone takes longer until the nameservers serve it than a change in an
+// existing one (73 against 21 to 31 seconds, measured once in production).
+//
+// A set has one TTL. Records written with a TTL give it to the whole set, the
+// AAAA records included when A records are written and the other way round,
+// as with libdns/hetzner; AppendRecords that adds a record therefore changes
+// the TTL of the existing records of its set, which the libdns contract does
+// not foresee. A TTL of 0
+// keeps the set's TTL; TTLs are brought into 60 seconds to one day.
+// DeleteRecords does not compare TTLs.
 //
 // Record sets that mStudio manages (the addresses of a name connected to an
 // ingress, the mail exchangers of mittwald's mail service) are not returned
@@ -27,6 +37,7 @@ import (
 
 	"github.com/libdns/libdns"
 	generatedv2 "github.com/mittwald/api-client-go/mittwaldv2/generated/clients"
+	"github.com/mittwald/api-client-go/mittwaldv2/generated/clients/domainclientv2"
 	"github.com/mittwald/api-client-go/mittwaldv2/generated/schemas/dnsv2"
 )
 
@@ -302,7 +313,8 @@ func (p *Provider) change(ctx context.Context, zone string, records []libdns.Rec
 				return result, err
 			}
 		}
-		next, res := edit(current, byName[name])
+		// edit may reorder or clear its slice; current is read again below.
+		next, res := edit(slices.Clone(current), byName[name])
 		if len(res) == 0 {
 			continue
 		}
@@ -320,6 +332,35 @@ func (p *Provider) change(ctx context.Context, zone string, records []libdns.Rec
 			} else {
 				unset = append(unset, s)
 			}
+		}
+		if !filter {
+			for _, s := range set {
+				if next, err = sameTTL(s, next, res, current); err != nil {
+					return result, err
+				}
+				if res, err = sameTTL(s, res, res, current); err != nil {
+					return result, err
+				}
+			}
+		}
+		// A name below the domain whose last record goes has its zone deleted,
+		// unless mStudio manages a set of it or other zones lie below it.
+		if len(next) == 0 && name != root.Domain && !hasManagedSet(z) &&
+			!slices.ContainsFunc(zones, func(o dnsv2.Zone) bool { return strings.HasSuffix(o.Domain, "."+name) }) {
+			// Once a zone is deleted while it has a CAA set, mStudio answers
+			// every CAA set of a new zone of that name with 500; a set unset
+			// before does not do this.
+			if slices.ContainsFunc(current, func(c libdns.Record) bool { return c.RR().Type == "CAA" }) {
+				if err := setRecordSet(ctx, p.client, z.Id, slotCAA, domainclientv2.UpdateRecordSetRequestBody{AlternativeRecordUnset: &dnsv2.RecordUnset{}}); err != nil {
+					return result, err
+				}
+			}
+			if err := deleteZone(ctx, p.client, z.Id); err != nil {
+				return result, err
+			}
+			zones = slices.DeleteFunc(zones, func(o dnsv2.Zone) bool { return o.Id == z.Id })
+			result = append(result, res...)
+			continue
 		}
 		if z.Id == "" {
 			if z.Id, err = createZone(ctx, p.client, root.Id, strings.TrimSuffix(name, "."+root.Domain)); err != nil {

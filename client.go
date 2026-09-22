@@ -87,6 +87,15 @@ func createZone(ctx context.Context, c generatedv2.Client, rootID, label string)
 	return created.Id, nil
 }
 
+func deleteZone(ctx context.Context, c generatedv2.Client, id string) error {
+	resp, err := c.Domain().DeleteDNSZone(ctx, domainclientv2.DeleteDNSZoneRequest{DNSZoneID: id})
+	closeBody(resp)
+	if err != nil {
+		return fmt.Errorf("deleting zone %s: %w", id, err)
+	}
+	return nil
+}
+
 // setRecordSet replaces one record set of a zone.
 func setRecordSet(ctx context.Context, c generatedv2.Client, zoneID string, set domainclientv2.UpdateRecordSetRequestPathRecordSet, body domainclientv2.UpdateRecordSetRequestBody) error {
 	resp, err := c.Domain().UpdateRecordSet(ctx, domainclientv2.UpdateRecordSetRequest{DNSZoneID: zoneID, RecordSet: set, Body: body})

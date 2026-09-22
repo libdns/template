@@ -25,6 +25,8 @@ type fakeAPI struct {
 	nextID int
 	event  int
 	url    string // where the fake listens, for Provider.apiURL
+
+	caaPoisoned []string // names whose zone was deleted with a CAA set
 }
 
 func unsetSets() map[string]any {
@@ -87,6 +89,13 @@ func (f *fakeAPI) serve(w http.ResponseWriter, r *http.Request) {
 		id := fmt.Sprintf("z%d", f.nextID)
 		f.zones[id] = map[string]any{"id": id, "domain": body.Name + "." + parent["domain"].(string), "recordSet": unsetSets()}
 		write(201, map[string]string{"id": id})
+	case r.Method == http.MethodDelete && len(parts) == 2 && parts[0] == "dns-zones":
+		// Like mStudio: a zone deleted with a CAA set leaves its name unable to take CAA again.
+		if z := f.zones[parts[1]]; len(z["recordSet"].(map[string]any)["caa"].(map[string]any)) > 0 {
+			f.caaPoisoned = append(f.caaPoisoned, z["domain"].(string))
+		}
+		delete(f.zones, parts[1])
+		write(204, nil)
 	case r.Method == http.MethodPut && len(parts) == 4 && parts[0] == "dns-zones" && parts[2] == "record-sets":
 		z := f.zones[parts[1]]
 		var body map[string]any
@@ -99,6 +108,10 @@ func (f *fakeAPI) serve(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
+		}
+		if parts[3] == "caa" && len(body) > 0 && slices.Contains(f.caaPoisoned, z["domain"].(string)) {
+			write(500, map[string]string{"type": "InternalError", "message": "internal error"})
+			return
 		}
 		sets[slotKey[parts[3]]] = body
 		write(204, nil)
@@ -128,7 +141,7 @@ func (f *fakeAPI) set(domain, key string) map[string]any {
 	return z["recordSet"].(map[string]any)[key].(map[string]any)
 }
 
-func TestAppendAndDeleteTXTCreatesAndKeepsTheZone(t *testing.T) {
+func TestAppendAndDeleteTXTCreatesAndDeletesTheZone(t *testing.T) {
 	f := newFakeAPI(t)
 	p := &Provider{APIToken: "t", apiURL: f.url}
 	ctx := context.Background()
@@ -157,11 +170,114 @@ func TestAppendAndDeleteTXTCreatesAndKeepsTheZone(t *testing.T) {
 	if _, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{libdns.TXT{Name: "_acme-challenge", Text: "two"}}); err != nil {
 		t.Fatal(err)
 	}
-	if s := f.set("_acme-challenge.example.com", "txt"); len(s) != 0 {
-		t.Errorf("want the set unset, got %v", s)
+	if f.zoneNamed("_acme-challenge.example.com") != nil {
+		t.Error("the zone of a name without records is deleted")
 	}
-	if f.zoneNamed("_acme-challenge.example.com") == nil {
-		t.Error("the zone of the name stays")
+}
+
+func TestZonesThatStayWhenTheirRecordsGo(t *testing.T) {
+	f := newFakeAPI(t)
+	p := &Provider{APIToken: "t", apiURL: f.url}
+	ctx := context.Background()
+	// The domain's own zone stays.
+	if _, err := p.AppendRecords(ctx, "example.com.", []libdns.Record{libdns.TXT{Name: "@", Text: "x"}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{libdns.TXT{Name: "@", Text: "x"}}); err != nil {
+		t.Fatal(err)
+	}
+	if f.zoneNamed("example.com") == nil {
+		t.Error("the root zone stays")
+	}
+	// A name whose last own record goes but that has a managed set keeps its zone.
+	f.mu.Lock()
+	sets := unsetSets()
+	sets["combinedARecords"] = map[string]any{"managedBy": map[string]any{"ingressId": "00000000-0000-0000-0000-000000000002"}}
+	sets["txt"] = map[string]any{"entries": []any{"v"}, "settings": map[string]any{"ttl": map[string]any{"auto": true}}}
+	f.zones["shop"] = map[string]any{"id": "shop", "domain": "shop.example.com", "recordSet": sets}
+	f.mu.Unlock()
+	if _, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{libdns.TXT{Name: "shop", Text: "v"}}); err != nil {
+		t.Fatal(err)
+	}
+	if f.zoneNamed("shop.example.com") == nil {
+		t.Error("a zone with a managed A set stays")
+	}
+	// The same for a managed MX set.
+	f.mu.Lock()
+	sets = unsetSets()
+	sets["mx"] = map[string]any{"managed": true}
+	sets["txt"] = map[string]any{"entries": []any{"v"}, "settings": map[string]any{"ttl": map[string]any{"auto": true}}}
+	f.zones["mail"] = map[string]any{"id": "mail", "domain": "mail.example.com", "recordSet": sets}
+	f.mu.Unlock()
+	if _, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{libdns.TXT{Name: "mail", Text: "v"}}); err != nil {
+		t.Fatal(err)
+	}
+	if f.zoneNamed("mail.example.com") == nil {
+		t.Error("a zone with a managed MX set stays")
+	}
+	// A zone with zones below it stays.
+	if _, err := p.AppendRecords(ctx, "example.com.", []libdns.Record{
+		libdns.TXT{Name: "a", Text: "v"}, libdns.TXT{Name: "b.a", Text: "v"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{libdns.TXT{Name: "a", Text: "v"}}); err != nil {
+		t.Fatal(err)
+	}
+	if f.zoneNamed("a.example.com") == nil {
+		t.Error("a zone with zones below it stays")
+	}
+}
+
+func TestCAAWorksAgainAfterItsZoneWasDeleted(t *testing.T) {
+	f := newFakeAPI(t)
+	p := &Provider{APIToken: "t", apiURL: f.url}
+	ctx := context.Background()
+	caa := libdns.CAA{Name: "c", Tag: "issue", Value: "letsencrypt.org"}
+	for round := range 2 {
+		if _, err := p.AppendRecords(ctx, "example.com.", []libdns.Record{caa}); err != nil {
+			t.Fatalf("round %d: %v", round, err)
+		}
+		if _, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{caa}); err != nil {
+			t.Fatalf("round %d: %v", round, err)
+		}
+		if f.zoneNamed("c.example.com") != nil {
+			t.Fatalf("round %d: the zone is deleted", round)
+		}
+	}
+}
+
+func TestDeletingAZoneAndTheOneAboveItInOneCall(t *testing.T) {
+	f := newFakeAPI(t)
+	p := &Provider{APIToken: "t", apiURL: f.url}
+	ctx := context.Background()
+	recs := []libdns.Record{libdns.TXT{Name: "b.a", Text: "v"}, libdns.TXT{Name: "a", Text: "v"}}
+	if _, err := p.AppendRecords(ctx, "example.com.", recs); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.DeleteRecords(ctx, "example.com.", recs); err != nil {
+		t.Fatal(err)
+	}
+	if f.zoneNamed("a.example.com") != nil || f.zoneNamed("b.a.example.com") != nil {
+		t.Error("both zones are deleted")
+	}
+}
+
+func TestDeleteFindsARecordWhoseTTLWasChanged(t *testing.T) {
+	f := newFakeAPI(t)
+	p := &Provider{APIToken: "t", apiURL: f.url}
+	ctx := context.Background()
+	rec := libdns.TXT{Name: "_acme-challenge", TTL: 30 * time.Second, Text: "token"}
+	if _, err := p.AppendRecords(ctx, "example.com.", []libdns.Record{rec}); err != nil {
+		t.Fatal(err)
+	}
+	// Another write changes the TTL of the set.
+	if _, err := p.AppendRecords(ctx, "example.com.", []libdns.Record{libdns.TXT{Name: "_acme-challenge", TTL: 600 * time.Second, Text: "other"}}); err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := p.DeleteRecords(ctx, "example.com.", []libdns.Record{rec})
+	if err != nil || len(deleted) != 1 {
+		t.Fatalf("the caller's own record must be found, got %v, %v", deleted, err)
 	}
 }
 
@@ -320,17 +436,59 @@ func TestRejectsWhatMStudioCannotHold(t *testing.T) {
 	for _, rec := range []libdns.Record{
 		libdns.TXT{Name: "*", Text: "wildcard"},
 		libdns.NS{Name: "sub", Target: "ns.example.net."},
-		libdns.TXT{Name: "short", TTL: 30 * time.Second, Text: "ttl"},
 	} {
 		if _, err := p.AppendRecords(ctx, "example.com.", []libdns.Record{rec}); err == nil {
 			t.Errorf("%v: want an error", rec.RR())
 		}
 	}
-	if _, err := p.AppendRecords(ctx, "example.com.", []libdns.Record{
-		libdns.TXT{Name: "two", TTL: 300 * time.Second, Text: "a"},
-		libdns.TXT{Name: "two", TTL: 600 * time.Second, Text: "b"},
-	}); err == nil {
-		t.Error("two TTLs in one set: want an error")
+}
+
+// ttlOfSet returns the TTL mStudio stores for a set: "auto" or seconds.
+func (f *fakeAPI) ttlOfSet(domain, key string) any {
+	ttl := f.set(domain, key)["settings"].(map[string]any)["ttl"].(map[string]any)
+	if s, ok := ttl["seconds"]; ok {
+		return s
+	}
+	return "auto"
+}
+
+func TestTTLIsClampedAndTheLastOneWinsForTheSet(t *testing.T) {
+	f := newFakeAPI(t)
+	p := &Provider{APIToken: "t", apiURL: f.url}
+	ctx := context.Background()
+
+	added, err := p.AppendRecords(ctx, "example.com.", []libdns.Record{libdns.TXT{Name: "t", TTL: 30 * time.Second, Text: "a"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.ttlOfSet("t.example.com", "txt") != float64(60) || added[0].RR().TTL != 60*time.Second {
+		t.Errorf("30s is raised to 60s, got %v and %v", f.ttlOfSet("t.example.com", "txt"), added[0].RR().TTL)
+	}
+	// A TTL of 0 keeps the TTL of the set.
+	if _, err := p.AppendRecords(ctx, "example.com.", []libdns.Record{libdns.TXT{Name: "t", Text: "b"}}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.ttlOfSet("t.example.com", "txt"); got != float64(60) {
+		t.Errorf("TTL 0 keeps the set's TTL, got %v", got)
+	}
+	// Another TTL applies to the whole set.
+	if _, err := p.AppendRecords(ctx, "example.com.", []libdns.Record{libdns.TXT{Name: "t", TTL: 48 * time.Hour, Text: "c"}}); err != nil {
+		t.Fatal(err)
+	}
+	if got, n := f.ttlOfSet("t.example.com", "txt"), len(f.set("t.example.com", "txt")["entries"].([]any)); got != float64(86400) || n != 3 {
+		t.Errorf("want 3 entries with 86400s, got %d with %v", n, got)
+	}
+
+	// A and AAAA share a set: setting A gives AAAA its TTL.
+	if _, err := p.SetRecords(ctx, "example.com.", []libdns.Record{libdns.Address{Name: "www", TTL: 300 * time.Second, IP: netip.MustParseAddr("2001:db8::1")}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.SetRecords(ctx, "example.com.", []libdns.Record{libdns.Address{Name: "www", TTL: 600 * time.Second, IP: netip.MustParseAddr("192.0.2.1")}}); err != nil {
+		t.Fatal(err)
+	}
+	a := f.set("www.example.com", "combinedARecords")
+	if f.ttlOfSet("www.example.com", "combinedARecords") != float64(600) || fmt.Sprint(a["aaaa"]) != "[2001:db8::1]" {
+		t.Errorf("want A and AAAA with 600s, got %v", a)
 	}
 }
 

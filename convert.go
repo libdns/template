@@ -3,6 +3,7 @@ package mittwald
 import (
 	"fmt"
 	"net/netip"
+	"slices"
 	"strings"
 	"time"
 
@@ -16,6 +17,44 @@ const (
 	minTTL = 60 * time.Second
 	maxTTL = 86400 * time.Second
 )
+
+// clampTTL brings a TTL into the API's limits, as other libdns providers do
+// with theirs; 0 ("auto") stays 0.
+func clampTTL(ttl time.Duration) time.Duration {
+	if ttl == 0 {
+		return 0
+	}
+	return min(max(ttl, minTTL), maxTTL)
+}
+
+// sameTTL gives the records of set s in recs the TTL of the set: that of the
+// first record of s in written that has one, else that of the set before
+// (in current), else "auto". mStudio keeps one TTL per set, A and AAAA
+// together, so the TTL written last applies to the whole set, as with other
+// providers that keep one TTL per RRset.
+func sameTTL(s slot, recs, written, current []libdns.Record) ([]libdns.Record, error) {
+	inSet := func(r libdns.Record) bool { t, _ := slotOf(r.RR().Type); return t == s }
+	var ttl time.Duration
+	if i := slices.IndexFunc(written, func(r libdns.Record) bool { return inSet(r) && r.RR().TTL != 0 }); i >= 0 {
+		ttl = clampTTL(written[i].RR().TTL)
+	} else if i := slices.IndexFunc(current, inSet); i >= 0 {
+		ttl = current[i].RR().TTL
+	}
+	out := make([]libdns.Record, len(recs))
+	for i, r := range recs {
+		out[i] = r
+		if inSet(r) && r.RR().TTL != ttl {
+			rr := r.RR()
+			rr.TTL = ttl
+			rec, err := rr.Parse()
+			if err != nil {
+				return nil, err
+			}
+			out[i] = rec
+		}
+	}
+	return out, nil
+}
 
 // slot is one record set of a zone. A and AAAA share one.
 type slot = domainclientv2.UpdateRecordSetRequestPathRecordSet
@@ -54,6 +93,14 @@ back as RecordUnset and, for example, as a CNAME with an empty target. A set
 is therefore only read when it is not unset. A set that mStudio manages
 (managedBy an ingress, managed mail exchangers) is not read either.
 */
+
+// hasManagedSet reports whether mStudio manages a set of the zone (the
+// addresses of an ingress, mittwald's mail exchangers).
+func hasManagedSet(z dnsv2.Zone) bool {
+	a, mx := z.RecordSet.CombinedARecords, z.RecordSet.Mx
+	return (a.AlternativeRecordUnset == nil && a.AlternativeCombinedAManaged != nil) ||
+		(mx.AlternativeRecordUnset == nil && mx.AlternativeRecordMXManaged != nil && mx.AlternativeRecordMXManaged.Managed)
+}
 
 // ttlOf returns the TTL of a set; "auto" is 0 (served as 60 seconds).
 func ttlOf(s dnsv2.RecordSettings) time.Duration {
@@ -131,8 +178,8 @@ func stringsOf[T ~string](in []T) []string {
 }
 
 // bodyFor builds the body that makes set s hold exactly the records of recs
-// that belong to it; no such record unsets it. All of them must have the same
-// TTL; 0 means "auto".
+// that belong to it; no such record unsets it. The set gets the TTL of the
+// first of them (see sameTTL); 0 means "auto".
 func bodyFor(s slot, recs []libdns.Record) (domainclientv2.UpdateRecordSetRequestBody, error) {
 	var mine []libdns.Record
 	for _, r := range recs {
@@ -143,17 +190,8 @@ func bodyFor(s slot, recs []libdns.Record) (domainclientv2.UpdateRecordSetReques
 	if len(mine) == 0 {
 		return domainclientv2.UpdateRecordSetRequestBody{AlternativeRecordUnset: &dnsv2.RecordUnset{}}, nil
 	}
-	ttl := mine[0].RR().TTL
-	for _, r := range mine[1:] {
-		if r.RR().TTL != ttl {
-			return domainclientv2.UpdateRecordSetRequestBody{}, fmt.Errorf("%s: mStudio keeps one TTL per record set (%s); found %s and %s", r.RR().Name, s, ttl, r.RR().TTL)
-		}
-	}
 	settings := dnsv2.RecordSettings{Ttl: &dnsv2.RecordSettingsTtl{AlternativeTtlAuto: &dnsv2.TtlAuto{Auto: true}}}
-	if ttl != 0 {
-		if ttl < minTTL || ttl > maxTTL {
-			return domainclientv2.UpdateRecordSetRequestBody{}, fmt.Errorf("TTL %s is outside %s..%s", ttl, minTTL, maxTTL)
-		}
+	if ttl := clampTTL(mine[0].RR().TTL); ttl != 0 {
 		settings = dnsv2.RecordSettings{Ttl: &dnsv2.RecordSettingsTtl{AlternativeTtlSeconds: &dnsv2.TtlSeconds{Seconds: int64(ttl / time.Second)}}}
 	}
 
@@ -210,13 +248,12 @@ func bodyFor(s slot, recs []libdns.Record) (domainclientv2.UpdateRecordSetReques
 	return domainclientv2.UpdateRecordSetRequestBody{}, fmt.Errorf("unknown record set %s", s)
 }
 
-// sameRecord reports whether zone record z is what r describes. An empty type,
-// a zero TTL or empty data in r match anything, as DeleteRecords requires.
+// sameRecord reports whether zone record z is what r describes for
+// DeleteRecords: an empty type or empty data in r match anything. The TTL is
+// not compared: mStudio keeps one TTL per set, which another write may have
+// changed since r was written, as libdns/hetzner does not compare it either.
 func sameRecord(z, r libdns.RR) bool {
 	if r.Type != "" && r.Type != z.Type {
-		return false
-	}
-	if r.TTL != 0 && r.TTL != z.TTL {
 		return false
 	}
 	return r.Data == "" || canonical(z.Type, r.Data) == canonical(z.Type, z.Data)
