@@ -159,7 +159,7 @@ func (p *Provider) ListZones(ctx context.Context) ([]libdns.Zone, error) {
 
 	result := make([]libdns.Zone, 0, len(zones))
 	for _, z := range zones {
-		result = append(result, libdns.Zone{Name: z.Name + "."})
+		result = append(result, libdns.Zone{Name: strings.TrimSuffix(z.Name, ".") + "."})
 	}
 
 	return result, nil
