@@ -27,7 +27,6 @@ The zone must be a DNS zone on the same NameOcean account.
 - **TTLs:** NameOcean accepts 5m, 15m, 30m, 1h and 1d. Any other TTL is rounded to the closest of these (a tie goes to the shorter one); a zero TTL becomes 5m.
 - **SetRecords is not atomic.** NameOcean's per-record API has no batch call. SetRecords adds the new records first and deletes the old ones of the same (name, type) afterwards, so a name keeps answering during the change, but an error part-way can leave some changes made. Records that already match are left alone.
 - **Record types:** A, AAAA, CNAME, MX, TXT, SRV, CAA, NS, HTTPS and SVCB come back as the matching libdns structs; ALIAS (NameOcean's apex alias), PTR and DS as `libdns.RR`. NameOcean's HTTP redirect records are not DNS records and are not listed.
-- **One SRV record per name.** NameOcean currently stores a single SRV record for each name (for example one `_sip._tcp` target), so appending a second SRV to the same name fails with an API error.
 - Targets are returned fully qualified with a trailing dot; a target that is the zone itself is stored as `@` by NameOcean and returned as the zone's name.
 - Retries: GET and DELETE are retried twice on connection errors, 429 and 5xx; POST is not, so a record is never added twice.
 
@@ -39,5 +38,5 @@ The zone must be a DNS zone on the same NameOcean account.
 NAMEOCEAN_API_KEY=... LIBDNS_NAMEOCEAN_TEST_ZONE=example.com. go test -run TestLive -v
 ```
 
-The libdns test suite ([`libdnstest`](https://github.com/libdns/libdns/tree/master/libdnstest), libdns v1.2.0-alpha.1) passes ListZones, GetRecords, AppendRecords and DeleteRecords against a real zone with `SkipRRTypes{"SRV": true}`. Its SetRecords test fails only where it expects a 10 minute TTL back, because NameOcean rounds that to 5m.
+The libdns test suite ([`libdnstest`](https://github.com/libdns/libdns/tree/master/libdnstest), libdns v1.2.0-alpha.1) passes ListZones, GetRecords, AppendRecords and DeleteRecords against a real zone, with every record type. Its SetRecords test fails only where it expects a 10 minute TTL back, because NameOcean rounds that to 5m.
 
